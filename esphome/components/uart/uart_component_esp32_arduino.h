@@ -12,6 +12,41 @@
 namespace esphome {
 namespace uart {
 
+class ESP8266SoftwareSerial {
+ public:
+  void setup(InternalGPIOPin *tx_pin, InternalGPIOPin *rx_pin, uint32_t baud_rate, uint8_t stop_bits,
+             uint32_t data_bits, UARTParityOptions parity, size_t rx_buffer_size);
+
+  uint8_t read_byte();
+  uint8_t peek_byte();
+
+  void flush();
+
+  void write_byte(uint8_t data);
+
+  int available();
+
+ protected:
+  static void gpio_intr(ESP8266SoftwareSerial *arg);
+
+  void wait_(uint32_t *wait, const uint32_t &start);
+  bool read_bit_(uint32_t *wait, const uint32_t &start);
+  void write_bit_(bool bit, uint32_t *wait, const uint32_t &start);
+
+  uint32_t bit_time_{0};
+  uint8_t *rx_buffer_{nullptr};
+  size_t rx_buffer_size_;
+  volatile size_t rx_in_pos_{0};
+  size_t rx_out_pos_{0};
+  uint8_t stop_bits_;
+  uint8_t data_bits_;
+  UARTParityOptions parity_;
+  InternalGPIOPin *gpio_tx_pin_{nullptr};
+  ISRInternalGPIOPin tx_pin_;
+  InternalGPIOPin *gpio_rx_pin_{nullptr};
+  ISRInternalGPIOPin rx_pin_;
+};
+
 class ESP32ArduinoUARTComponent : public UARTComponent, public Component {
  public:
   void setup() override;
@@ -32,6 +67,7 @@ class ESP32ArduinoUARTComponent : public UARTComponent, public Component {
   void check_logger_conflict() override;
 
   HardwareSerial *hw_serial_{nullptr};
+  ESP8266SoftwareSerial *sw_serial_{nullptr};
 };
 
 }  // namespace uart
