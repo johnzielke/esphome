@@ -102,6 +102,7 @@ UART_PARITY_OPTIONS = {
 CONF_STOP_BITS = "stop_bits"
 CONF_DATA_BITS = "data_bits"
 CONF_PARITY = "parity"
+CONF_FALLBACK_TO_SERIAL = "esp32_fallback_to_serial"
 
 UARTDirection = uart_ns.enum("UARTDirection")
 UART_DIRECTIONS = {
@@ -172,6 +173,7 @@ CONFIG_SCHEMA = cv.All(
             cv.Optional(CONF_INVERT): cv.invalid(
                 "This option has been removed. Please instead use invert in the tx/rx pin schemas."
             ),
+            cv.Optional(CONF_FALLBACK_TO_SERIAL, default=False): cv.boolean
             cv.Optional(CONF_DEBUG): maybe_empty_debug,
         }
     ).extend(cv.COMPONENT_SCHEMA),
@@ -222,7 +224,8 @@ async def to_code(config):
     cg.add(var.set_stop_bits(config[CONF_STOP_BITS]))
     cg.add(var.set_data_bits(config[CONF_DATA_BITS]))
     cg.add(var.set_parity(config[CONF_PARITY]))
-
+    if config[CONF_FALLBACK_TO_SERIAL]:
+        cg.add_define("ESP32_UART_FALLBACK_TO_SERIAL")
     if CONF_DEBUG in config:
         await debug_to_code(config[CONF_DEBUG], var)
 

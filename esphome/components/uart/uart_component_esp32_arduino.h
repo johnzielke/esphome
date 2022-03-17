@@ -12,7 +12,8 @@
 namespace esphome {
 namespace uart {
 
-class ESP8266SoftwareSerial {
+#ifdef ESP32_UART_FALLBACK_TO_SERIAL
+class ESP32SoftwareSerial {
  public:
   void setup(InternalGPIOPin *tx_pin, InternalGPIOPin *rx_pin, uint32_t baud_rate, uint8_t stop_bits,
              uint32_t data_bits, UARTParityOptions parity, size_t rx_buffer_size);
@@ -27,7 +28,7 @@ class ESP8266SoftwareSerial {
   int available();
 
  protected:
-  static void gpio_intr(ESP8266SoftwareSerial *arg);
+  static void gpio_intr(ESP32SoftwareSerial *arg);
 
   void wait_(uint32_t *wait, const uint32_t &start);
   bool read_bit_(uint32_t *wait, const uint32_t &start);
@@ -47,6 +48,7 @@ class ESP8266SoftwareSerial {
   ISRInternalGPIOPin rx_pin_;
 };
 
+#endif // ESP32_UART_FALLBACK_TO_SERIAL
 class ESP32ArduinoUARTComponent : public UARTComponent, public Component {
  public:
   void setup() override;
@@ -67,7 +69,10 @@ class ESP32ArduinoUARTComponent : public UARTComponent, public Component {
   void check_logger_conflict() override;
 
   HardwareSerial *hw_serial_{nullptr};
+
+  #ifdef ESP32_UART_FALLBACK_TO_SERIAL
   ESP8266SoftwareSerial *sw_serial_{nullptr};
+  #endif // ESP32_UART_FALLBACK_TO_SERIAL
 };
 
 }  // namespace uart

@@ -102,15 +102,20 @@ namespace esphome
       {
         this->hw_serial_ = &Serial;
       }
-      else if (next_uart_num < 3)
+      else
+#ifdef ESP32_UART_FALLBACK_TO_SERIAL
+       if (next_uart_num < 3)
+#endif
       {
-        
         this->hw_serial_ = new HardwareSerial(next_uart_num++); // NOLINT(cppcoreguidelines-owning-memory)
       }
+#ifdef ESP32_UART_FALLBACK_TO_SERIAL
+
       else
       {
-        this->sw_serial_ = new ESP8266SoftwareSerial();
+        this->sw_serial_ = new ESP32SoftwareSerial();
       }
+#endif
       int8_t tx = this->tx_pin_ != nullptr ? this->tx_pin_->get_pin() : -1;
       int8_t rx = this->rx_pin_ != nullptr ? this->rx_pin_->get_pin() : -1;
       bool invert = false;
@@ -118,16 +123,23 @@ namespace esphome
         invert = true;
       if (rx_pin_ != nullptr && rx_pin_->is_inverted())
         invert = true;
+#ifdef ESP32_UART_FALLBACK_TO_SERIAL
+
       if (this->hw_serial_ != nullptr)
       {
+#endif
+
         this->hw_serial_->begin(this->baud_rate_, get_config(), rx, tx, invert);
         this->hw_serial_->setRxBufferSize(this->rx_buffer_size_);
+#ifdef ESP32_UART_FALLBACK_TO_SERIAL
+
       }
       else
       {
         this->sw_serial_->setup(tx_pin_, rx_pin_, this->baud_rate_, this->stop_bits_, this->data_bits_, this->parity_,
                                 this->rx_buffer_size_);
       }
+#endif
     }
 
     void ESP32ArduinoUARTComponent::dump_config()
@@ -172,6 +184,7 @@ namespace esphome
 
     void ESP32ArduinoUARTComponent::write_array(const uint8_t *data, size_t len)
     {
+#ifdef ESP32_UART_FALLBACK_TO_SERIAL
       if (this->hw_serial_ != nullptr)
       {
         this->hw_serial_->write(data, len);
@@ -181,6 +194,9 @@ namespace esphome
         for (size_t i = 0; i < len; i++)
           this->sw_serial_->write_byte(data[i]);
       }
+#else
+      this->hw_serial_->write(data, len);
+#endif
 #ifdef USE_UART_DEBUGGER
       for (size_t i = 0; i < len; i++)
       {
@@ -192,6 +208,7 @@ namespace esphome
     {
       if (!this->check_read_timeout_())
         return false;
+#ifdef ESP32_UART_FALLBACK_TO_SERIAL
       if (this->hw_serial_ != nullptr)
       {
         *data = this->hw_serial_->peek();
@@ -200,12 +217,16 @@ namespace esphome
       {
         *data = this->sw_serial_->peek_byte();
       }
+#else
+      *data = this->hw_serial_->peek();
+#endif
       return true;
     }
     bool ESP32ArduinoUARTComponent::read_array(uint8_t *data, size_t len)
     {
       if (!this->check_read_timeout_(len))
         return false;
+#ifdef ESP32_UART_FALLBACK_TO_SERIAL
       if (this->hw_serial_ != nullptr)
       {
         this->hw_serial_->readBytes(data, len);
@@ -215,6 +236,9 @@ namespace esphome
         for (size_t i = 0; i < len; i++)
           data[i] = this->sw_serial_->read_byte();
       }
+#else
+      this->hw_serial_->readBytes(data, len);
+#endif
 #ifdef USE_UART_DEBUGGER
       for (size_t i = 0; i < len; i++)
       {
@@ -225,6 +249,7 @@ namespace esphome
     }
     int ESP32ArduinoUARTComponent::available()
     {
+#ifdef ESP32_UART_FALLBACK_TO_SERIAL
       if (this->hw_serial_ != nullptr)
       {
         return this->hw_serial_->available();
@@ -233,6 +258,9 @@ namespace esphome
       {
         return this->sw_serial_->available();
       }
+#else
+          return this->hw_serial_->available();
+#endif // ESP32_UART_FALLBACK_TO_SERIAL
     }
     void ESP32ArduinoUARTComponent::flush()
     {
@@ -247,7 +275,8 @@ namespace esphome
       }
     }
 
-    void ESP8266SoftwareSerial::setup(InternalGPIOPin *tx_pin, InternalGPIOPin *rx_pin, uint32_t baud_rate,
+#ifdef ESP32_UART_FALLBACK_TO_SERIAL
+    void ESP32SoftwareSerial::setup(InternalGPIOPin *tx_pin, InternalGPIOPin *rx_pin, uint32_t baud_rate,
                                       uint8_t stop_bits, uint32_t data_bits, UARTParityOptions parity,
                                       size_t rx_buffer_size)
     {
@@ -269,10 +298,10 @@ namespace esphome
         gpio_rx_pin_->setup();
         rx_pin_ = gpio_rx_pin_->to_isr();
         rx_buffer_ = new uint8_t[this->rx_buffer_size_]; // NOLINT
-        gpio_rx_pin_->attach_interrupt(ESP8266SoftwareSerial::gpio_intr, this, gpio::INTERRUPT_FALLING_EDGE);
+        gpio_rx_pin_->attach_interrupt(ESP32SoftwareSerial::gpio_intr, this, gpio::INTERRUPT_FALLING_EDGE);
       }
     }
-    void IRAM_ATTR ESP8266SoftwareSerial::gpio_intr(ESP8266SoftwareSerial *arg)
+    void IRAM_ATTR ESP32SoftwareSerial::gpio_intr(ESP32SoftwareSerial *arg)
     {
       uint32_t wait = arg->bit_time_ + arg->bit_time_ / 3 - 500;
       const uint32_t start = arch_get_cpu_cycle_count();
@@ -296,7 +325,7 @@ namespace esphome
       // Clear RX pin so that the interrupt doesn't re-trigger right away again.
       arg->rx_pin_.clear_interrupt();
     }
-    void IRAM_ATTR HOT ESP8266SoftwareSerial::write_byte(uint8_t data)
+    void IRAM_ATTR HOT ESP32SoftwareSerial::write_byte(uint8_t data)
     {
       if (this->gpio_tx_pin_ == nullptr)
       {
@@ -339,23 +368,23 @@ namespace esphome
           this->wait_(&wait, start);
       }
     }
-    void IRAM_ATTR ESP8266SoftwareSerial::wait_(uint32_t *wait, const uint32_t &start)
+    void IRAM_ATTR ESP32SoftwareSerial::wait_(uint32_t *wait, const uint32_t &start)
     {
       while (arch_get_cpu_cycle_count() - start < *wait)
         ;
       *wait += this->bit_time_;
     }
-    bool IRAM_ATTR ESP8266SoftwareSerial::read_bit_(uint32_t *wait, const uint32_t &start)
+    bool IRAM_ATTR ESP32SoftwareSerial::read_bit_(uint32_t *wait, const uint32_t &start)
     {
       this->wait_(wait, start);
       return this->rx_pin_.digital_read();
     }
-    void IRAM_ATTR ESP8266SoftwareSerial::write_bit_(bool bit, uint32_t *wait, const uint32_t &start)
+    void IRAM_ATTR ESP32SoftwareSerial::write_bit_(bool bit, uint32_t *wait, const uint32_t &start)
     {
       this->tx_pin_.digital_write(bit);
       this->wait_(wait, start);
     }
-    uint8_t ESP8266SoftwareSerial::read_byte()
+    uint8_t ESP32SoftwareSerial::read_byte()
     {
       if (this->rx_in_pos_ == this->rx_out_pos_)
         return 0;
@@ -363,23 +392,24 @@ namespace esphome
       this->rx_out_pos_ = (this->rx_out_pos_ + 1) % this->rx_buffer_size_;
       return data;
     }
-    uint8_t ESP8266SoftwareSerial::peek_byte()
+    uint8_t ESP32SoftwareSerial::peek_byte()
     {
       if (this->rx_in_pos_ == this->rx_out_pos_)
         return 0;
       return this->rx_buffer_[this->rx_out_pos_];
     }
-    void ESP8266SoftwareSerial::flush()
+    void ESP32SoftwareSerial::flush()
     {
       // Flush is a NO-OP with software serial, all bytes are written immediately.
     }
-    int ESP8266SoftwareSerial::available()
+    int ESP32SoftwareSerial::available()
     {
       int avail = int(this->rx_in_pos_) - int(this->rx_out_pos_);
       if (avail < 0)
         return avail + this->rx_buffer_size_;
       return avail;
     }
+#endif // ESP32_UART_FALLBACK_TO_SERIAL
 
   } // namespace uart
 } // namespace esphome
