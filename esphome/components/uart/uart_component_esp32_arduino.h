@@ -71,7 +71,7 @@ class ESP32ArduinoUARTComponent : public UARTComponent, public Component {
   HardwareSerial *hw_serial_{nullptr};
 
   #ifdef ESP32_UART_FALLBACK_TO_SERIAL
-  ESP8266SoftwareSerial *sw_serial_{nullptr};
+  ESP32SoftwareSerial *sw_serial_{nullptr};
   #endif // ESP32_UART_FALLBACK_TO_SERIAL
 };
 

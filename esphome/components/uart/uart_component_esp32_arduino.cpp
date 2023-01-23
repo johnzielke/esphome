@@ -265,6 +265,8 @@ namespace esphome
     void ESP32ArduinoUARTComponent::flush()
     {
       ESP_LOGVV(TAG, "    Flushing...");
+#ifdef ESP32_UART_FALLBACK_TO_SERIAL
+
       if (this->hw_serial_ != nullptr)
       {
         this->hw_serial_->flush();
@@ -273,6 +275,9 @@ namespace esphome
       {
         this->sw_serial_->flush();
       }
+#else
+      this->hw_serial_->flush();
+#endif // ESP32_UART_FALLBACK_TO_SERIAL
     }
 
 #ifdef ESP32_UART_FALLBACK_TO_SERIAL

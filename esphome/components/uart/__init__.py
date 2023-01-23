@@ -173,8 +173,8 @@ CONFIG_SCHEMA = cv.All(
             cv.Optional(CONF_INVERT): cv.invalid(
                 "This option has been removed. Please instead use invert in the tx/rx pin schemas."
             ),
-            cv.Optional(CONF_FALLBACK_TO_SERIAL, default=False): cv.boolean
-            cv.Optional(CONF_DEBUG): maybe_empty_debug,
+            cv.Optional(CONF_FALLBACK_TO_SERIAL, default=False): cv.boolean,
+            cv.Optional(CONF_DEBUG): maybe_empty_debug
         }
     ).extend(cv.COMPONENT_SCHEMA),
     cv.has_at_least_one_key(CONF_TX_PIN, CONF_RX_PIN),
